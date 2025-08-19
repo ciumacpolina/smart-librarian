@@ -1,0 +1,35 @@
+# Secrete / variabile de mediu
+.env
+.env.* 
+
+# Cache Python
+__pycache__/
+*.py[cod]
+
+# Foldere venv (depinde cum l-ai creat)
+.venv/
+venv/
+env/
+
+# Baze de date / vector store local
+chroma_db/
+
+# Fișiere media generate la runtime (imagini, audio, temp)
+static/gen/
+static/audio/
+*.webm
+*.mp3
+*.wav
+
+# Loguri / temporare
+*.log
+*.tmp
+*.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Build / dist (dacă vei avea)
+build/
+dist/

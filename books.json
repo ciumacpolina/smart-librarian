@@ -1,0 +1,52 @@
+[
+  {
+    "title": "1984",
+    "summary": "A dystopian society ruled by total surveillance and propaganda. Winston tries to preserve truth and inner freedom in the face of a regime that controls thought.",
+    "themes": ["dystopia", "social control", "freedom", "propaganda", "surveillance"]
+  },
+  {
+    "title": "The Hobbit",
+    "summary": "Bilbo Baggins embarks on an unexpected adventure alongside dwarves to recover a treasure guarded by the dragon Smaug. He discovers courage, friendship, and a stronger self.",
+    "themes": ["fantasy", "adventure", "friendship", "courage"]
+  },
+  {
+    "title": "Harry Potter and the Philosopher's Stone",
+    "summary": "A boy discovers he is a wizard and arrives at Hogwarts, where friendship and courage help him face the first dangers of the magical world.",
+    "themes": ["fantasy", "magic", "friendship", "coming-of-age"]
+  },
+  {
+    "title": "Pride and Prejudice",
+    "summary": "Elizabeth Bennet navigates social conventions and class prejudice, learning about herself and love in her complicated relationship with Mr. Darcy.",
+    "themes": ["romance", "society", "social class", "family"]
+  },
+  {
+    "title": "To Kill a Mockingbird",
+    "summary": "In a small town in the American South, Scout witnesses racial injustice through the eyes of childhood while her father, a lawyer, defends a man wrongly accused.",
+    "themes": ["justice", "racism", "morality", "childhood"]
+  },
+  {
+    "title": "The Great Gatsby",
+    "summary": "Jay Gatsby pursues a dream of love and status in the glittering yet hollow world of the 1920s, where appearances hide disillusionment.",
+    "themes": ["american dream", "wealth", "love", "illusion"]
+  },
+  {
+    "title": "Moby-Dick",
+    "summary": "Captain Ahab sets out on an obsessive hunt for a white whale. A meditation on fate, nature, and revenge at sea.",
+    "themes": ["adventure", "obsession", "nature", "fate", "sea"]
+  },
+  {
+    "title": "War and Peace",
+    "summary": "The lives of numerous characters intertwine during the Napoleonic wars, amid love, loss, and questions about the meaning of history.",
+    "themes": ["war", "history", "society", "love"]
+  },
+  {
+    "title": "The Catcher in the Rye",
+    "summary": "Holden Caulfield wanders through New York, grappling with alienation and the painful passage into adulthood.",
+    "themes": ["coming-of-age", "alienation", "identity"]
+  },
+  {
+    "title": "The Fellowship of the Ring",
+    "summary": "A ring of power threatens the world. A fellowship sets out on a perilous quest to destroy it, testing loyalty and courage.",
+    "themes": ["fantasy", "journey", "power", "friendship", "courage"]
+  }
+]
