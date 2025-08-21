@@ -3,8 +3,8 @@
 // Main background bookshelf
 const svg = document.getElementById('animated-bookshelf');
 if (svg) {
-  const shelves = 5;
-  const booksPerShelf = 12;
+  const shelves = 6; // era 5, acum 6 rafturi
+  const booksPerShelf = 18; // era 12, acum 18 cărți pe raft
   const shelfHeight = 120;
   const bookMin = 28, bookMax = 54;
   const colors = [
@@ -63,8 +63,8 @@ if (svg) {
 function drawSideBookshelf(svg, flip = false) {
   if (!svg) return;
   svg.innerHTML = '';
-  const shelfCount = 6;
-  const shelfGap = 140;
+  const shelfCount = 8; // era 6, acum 8 rafturi laterale
+  const shelfGap = 100; // mai apropiate între ele
   const bookColors = [
     'var(--book1)', 'var(--book2)', 'var(--book3)', 'var(--book4)', 'var(--book5)'
   ];
@@ -83,7 +83,7 @@ function drawSideBookshelf(svg, flip = false) {
 
     // Books
     let x = 18;
-    const books = 4 + Math.floor(Math.random() * 3);
+    const books = 7 + Math.floor(Math.random() * 3); // era 4-6, acum 7-9 cărți pe raft lateral
     for (let b = 0; b < books; ++b) {
       const w = 14 + Math.random() * 18;
       const h = 38 + Math.random() * 32;
