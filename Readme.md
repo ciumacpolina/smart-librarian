@@ -9,7 +9,7 @@
 
 ---
 
-## ✨ Features
+## Features
 
 - **Semantic Book Search:** Finds relevant books by theme, genre, or keywords using OpenAI embeddings.
 - **Conversational Chatbot:** Natural language chat, intent detection, and moderation.
@@ -20,24 +20,24 @@
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ```bash
 git clone https://github.com/username/book_chatbot.git
 cd book_chatbot
 
-# Add your OpenAI key in a .env file
+# Add OpenAI key in a .env file
 echo "OPENAI_API_KEY=sk-..." > .env
 
 pip install -r requirements.txt
 python web.py
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in browser.
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 book_chatbot/
@@ -63,12 +63,12 @@ book_chatbot/
 │   └── index.html      # Main web UI
 │
 ├── requirements.txt
-└── .env                # Your OpenAI API key (not in git)
+└── .env                
 ```
 
 ---
 
-## 🧠 How Embedding is Used
+## How Embedding is Used
 
 - Each book in `data/books.json` is embedded into a semantic vector using OpenAI.
 - User queries are also embedded.
@@ -77,7 +77,7 @@ book_chatbot/
 
 ---
 
-## 💡 Example Usage
+## Example Usage
 
 - **User:** `Recommend a fantasy book about friendship`
 - **Bot:** Suggests 1–3 relevant titles, each with a full extended summary and reasons for recommendation.
@@ -85,7 +85,7 @@ book_chatbot/
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 - Python 3.9+
 - OpenAI API key (`OPENAI_API_KEY`)
@@ -100,10 +100,5 @@ book_chatbot/
 
 ---
 
-## 📝 License
 
-MIT License
 
----
-
-> Made with ❤️ for book lovers and AI enthusiasts.
