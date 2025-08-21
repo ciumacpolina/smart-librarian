@@ -1,4 +1,4 @@
-// static/app.js
+// static/js/app.js
 
 const form  = document.getElementById("form");
 const input = document.getElementById("input");
@@ -68,72 +68,65 @@ function attachTTS(btn, text) {
       }
       if (item.state === 'paused') {
         stopAllOtherPlayers(btn);
-        try {
-          if (typeof item.lastTime === 'number') {
-            item.audio.currentTime = item.lastTime;
-          }
-        } catch (e) {}
-        await item.audio.play().catch(() => {});
-        return;
-      }
-      if (item.state === 'ended') {
-        stopAllOtherPlayers(btn);
-        try {
-          item.audio.currentTime = typeof item.lastTime === 'number' ? item.lastTime : 0;
-        } catch (e) {}
-        await item.audio.play().catch(() => {});
+        item.audio.currentTime = item.lastTime || 0;
+        item.audio.play();
         return;
       }
     }
 
-    const old = btn.textContent;
-    btn.disabled = true; btn.textContent = '…';
-    try {
-      const blob = await fetchTTSBlob(text);
-      if (!blob) { btn.textContent = old; btn.disabled = false; return; }
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+    stopAllOtherPlayers(btn);
+    btn.disabled = true;
+    btn.textContent = '…';
 
-      stopAllOtherPlayers(btn);
-
-      audio.addEventListener('play', () => {
-        btn.textContent = '⏸';
-        const it = ttsPlayers.get(btn);
-        if (it) it.state = 'playing';
-      });
-      audio.addEventListener('pause', () => {
-        if (!audio.ended) {
-          const it = ttsPlayers.get(btn);
-          if (it) {
-            try { it.lastTime = audio.currentTime; } catch (e) {}
-            it.state = 'paused';
-          }
-          btn.textContent = '▶️';
-        }
-      });
-      audio.addEventListener('ended', () => {
-        btn.textContent = '🔊';
-        const it = ttsPlayers.get(btn);
-        if (it) it.state = 'ended';
-      });
-      audio.addEventListener('error', () => {
-        btn.textContent = '🔊';
-        const it = ttsPlayers.get(btn);
-        if (it) it.state = 'idle';
-      });
-
-      ttsPlayers.set(btn, { audio, state: 'loading', url, lastTime: 0 });
+    const blob = await fetchTTSBlob(text);
+    if (!blob) {
+      btn.textContent = '🔊';
       btn.disabled = false;
-
-      await audio.play().catch(() => {});
-    } catch (e) {
-      console.error('TTS fetch/play error', e);
-      btn.textContent = old; btn.disabled = false;
+      return;
     }
+
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    audio.addEventListener('play', () => {
+      btn.textContent = '⏸';
+      const it = ttsPlayers.get(btn);
+      if (it) it.state = 'playing';
+    });
+
+    audio.addEventListener('pause', () => {
+      if (!audio.ended) {
+        const it = ttsPlayers.get(btn);
+        if (it) {
+          try { it.lastTime = audio.currentTime; } catch (e) {}
+          it.state = 'paused';
+        }
+        btn.textContent = '▶️';
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      btn.textContent = '🔊';
+      const it = ttsPlayers.get(btn);
+      if (it) it.state = 'ended';
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      ttsPlayers.delete(btn);
+    });
+
+    audio.addEventListener('error', () => {
+      btn.textContent = '🔊';
+      const it = ttsPlayers.get(btn);
+      if (it) it.state = 'idle';
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      ttsPlayers.delete(btn);
+    });
+
+    ttsPlayers.set(btn, { audio, state: 'loading', url, lastTime: 0 });
+    btn.disabled = false;
+    await audio.play().catch(() => {});
   });
 }
 
-// Adaugă butonul 🔊 la mesajul botului
 function addSpeakButtonToMessage(messageEl, text) {
   if (!messageEl) return;
   const btn = document.createElement('button');
@@ -246,13 +239,14 @@ async function generateImageFromText(text, hostEl) {
     img.className = 'gen-img';
     hostEl.appendChild(img);
 
+    // zoom la click
     img.addEventListener('click', () => img.classList.toggle('full'));
   } catch (e) {
     console.error('Image error', e);
   }
 }
 
-// găsește titlurile în markdown ca linii de forma **Title**
+// — găsește titlurile în markdown ca linii de forma **Title**
 function extractTitlesFromMarkdown(md) {
   const titles = [];
   const lines = (md || "").split(/\r?\n/);
@@ -263,50 +257,109 @@ function extractTitlesFromMarkdown(md) {
   return [...new Set(titles)];
 }
 
-// buton care generează imagini DOAR la click
-function addImageButtonToMessage(messageEl, replyMarkdown) {
-  if (!messageEl) return;
+// Împachetează secțiunile începute cu **Title** într-un "card" frumos
+function beautifyBookBlocks(container) {
+  if (!container) return;
+  const pList = Array.from(container.querySelectorAll('p'));
 
-  const titles = extractTitlesFromMarkdown(replyMarkdown);
+  for (let i = 0; i < pList.length; i++) {
+    const p = pList[i];
+    // paragrafe care conțin DOAR <strong>Title</strong>
+    if (
+      p.children.length === 1 &&
+      p.firstElementChild.tagName === 'STRONG' &&
+      p.textContent.trim()
+    ) {
+      const title = p.textContent.trim();
 
-  const btn = document.createElement('button');
-  // mic, doar icon, aliniat frumos
-  btn.className = 'btn btn-sm btn-outline-secondary icon-btn';
-  btn.innerHTML = '🖼️';                 // 👈 doar icon
-  btn.title = 'Generate images for detected titles';
-  btn.type = 'button';
-  btn.style.marginLeft = '8px';
+      // card
+      const card = document.createElement('div');
+      card.className = 'book-card';
 
-  if (titles.length === 0) {
-    btn.disabled = true;
-    btn.title = 'No book titles detected in this reply';
-  }
+      const header = document.createElement('div');
+      header.className = 'book-title';
+      header.textContent = title;
+      card.appendChild(header);
 
-  btn.onclick = async () => {
-    const old = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '…';
-    try {
-      for (const title of titles) {
-        const promptText = `Create a simple, minimalist illustration that represents the book "${title}".`;
-        await generateImageFromText(promptText, messageEl);
+      // mutăm în card toate nodurile până la următorul titlu
+      let node = p.nextSibling;
+      p.remove();
+
+      while (node) {
+        const next = node.nextSibling;
+
+        if (
+          node.nodeType === 1 &&
+          node.tagName === 'P' &&
+          node.children.length === 1 &&
+          node.firstElementChild.tagName === 'STRONG' &&
+          node.textContent.trim()
+        ) break;
+
+        card.appendChild(node);
+        node = next;
       }
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = old; // revine la 🖼️
-    }
-  };
 
-  const line = document.createElement('div');
-  line.style.marginTop = '6px';
-  line.appendChild(btn);
-  messageEl.appendChild(line);
+      if (node) container.insertBefore(card, node);
+      else container.appendChild(card);
+
+      // etichete
+      card.querySelectorAll('p').forEach(pp => {
+        const t = (pp.textContent || '').trim();
+        if (/^Why this book\??$/i.test(t)) {
+          pp.className = 'why-label';
+          pp.textContent = 'Why this book?';
+        } else if (/^Summary:?$/i.test(t)) {
+          pp.className = 'summary-label';
+          pp.textContent = 'Summary';
+        }
+      });
+
+      card.querySelectorAll('ul').forEach(ul => ul.classList.add('book-reasons'));
+    }
+  }
+}
+
+// — Creează un grup de butoane (🖼️ + numele cărții), unul pentru fiecare titlu
+function addImageButtonsForTitles(messageEl, replyMarkdown) {
+  if (!messageEl) return;
+  const titles = extractTitlesFromMarkdown(replyMarkdown);
+  if (!titles.length) return;
+
+  const box = document.createElement('div');
+  box.className = 'd-flex flex-wrap gap-2 mt-2';
+
+  titles.forEach((title) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-secondary icon-btn';
+    btn.title = `Generate image for "${title}"`;
+    btn.innerHTML = `🖼️ <span>${title}</span>`;
+
+    btn.onclick = async () => {
+      const old = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '…';
+      try {
+        const promptText = `Design a simple, minimalist book cover for the novel "${title}".
+Use clean layout, big readable title text, and one symbolic illustration.`;
+        await generateImageFromText(promptText, messageEl);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = old;
+      }
+    };
+
+    box.appendChild(btn);
+  });
+
+  messageEl.appendChild(box);
 }
 
 // ============ Chat rendering ============
 function addMsg(text, who) {
   const wrap = document.createElement("div");
-  wrap.className = `p-3 rounded mb-2 ${who === "user" ? "msg-user" : "msg-bot"}`;
+  wrap.className = `msg ${who === "user" ? "msg-user" : "msg-bot"}`;
 
   const header = `<strong>${who === "user" ? "You" : "Bot"}</strong><br>`;
   const body = who === "user"
@@ -318,6 +371,9 @@ function addMsg(text, who) {
   chat.scrollTop = chat.scrollHeight;
   return wrap;
 }
+// după ce selectezi #chat:
+addMsg("Hello! I can recommend books from our small library and include a full summary for the top pick. How can I help?", "bot");
+
 
 // ============ Submit handler ============
 form.addEventListener("submit", async (e) => {
@@ -348,13 +404,16 @@ form.addEventListener("submit", async (e) => {
     const replyText = data.reply || "(no reply)";
     const el = addMsg(replyText, "bot");
 
-    // TTS button
+    // transformăm blocurile în carduri
+    beautifyBookBlocks(el);
+
+    // TTS
     addSpeakButtonToMessage(el, replyText);
 
-    // IMAGINI: doar buton (nu generăm automat)
-    addImageButtonToMessage(el, replyText);
+    // butoane imagine (unul per titlu)
+    addImageButtonsForTitles(el, replyText);
 
-    // auto-speak (dacă ai checkbox în UI)
+    // auto-speak
     if (autoSpeakCheckbox && autoSpeakCheckbox.checked) {
       const fakeBtn = document.createElement('button');
       attachTTS(fakeBtn, replyText);

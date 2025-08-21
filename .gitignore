@@ -1,35 +1,49 @@
-# Secrete / variabile de mediu
+# Secrets / env
 .env
-.env.* 
+.env.*
 
-# Cache Python
+# Python cache & artifacts
 __pycache__/
 *.py[cod]
+*.pyd
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 
-# Foldere venv (depinde cum l-ai creat)
+# Virtual environments
 .venv/
 venv/
 env/
 
-# Baze de date / vector store local
+# Local databases / vector stores
 chroma_db/
 
-# Fișiere media generate la runtime (imagini, audio, temp)
+# Runtime media (generated)
 static/gen/
 static/audio/
+
+# Transient media & temps
 *.webm
 *.mp3
 *.wav
-
-# Loguri / temporare
-*.log
 *.tmp
-*.DS_Store
 
-# IDE
+# Logs
+*.log
+
+# Editors / IDE
 .vscode/
 .idea/
+*.code-workspace
 
-# Build / dist (dacă vei avea)
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build / dist
 build/
 dist/

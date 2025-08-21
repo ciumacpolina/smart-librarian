@@ -1,4 +1,4 @@
 openai
+flask
 chromadb
 python-dotenv
-

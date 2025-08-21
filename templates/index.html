@@ -4,68 +4,48 @@
     <meta charset="utf-8" />
     <title>Smart Librarian</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-
-    <style>
-      body { background:#ffffff; color:#111827; }
-      .page-wrap { max-width: 1000px; margin: 0 auto; }
-      .brand { display:flex; align-items:center; gap:.6rem; }
-      .brand .logo { font-size: 1.9rem; line-height: 1; }
-      .card { background:#ffffff; border:1px solid #e5e7eb; }
-      .msg-user { background:#e8f0fe; }
-      .msg-bot  { background:#f8fafc; border-left:3px solid #0d6efd; }
-      #chat { height: 60vh; overflow-y: auto; }
-
-      /* feedback vizual când microfonul înregistrează */
-      #micBtn.recording {
-        background:#fee2e2;
-        border-color:#ef4444;
-        color:#b91c1c;
-      }
-      /* ——— IMAGES (thumbnail + zoom) ——— */
-      .gen-img {
-      width: 256px;      /* afișăm mic în UI */
-      height: auto;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      margin-top: 8px;
-      cursor: zoom-in;
-  }
-    .gen-img.full {
-    width: 100%;
-    max-width: 640px;  /* plafon pentru zoom */
-    cursor: zoom-out;
-  }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css" />
   </head>
-  <body>
-    <div class="container py-4 page-wrap">
-      <div class="brand mb-2">
-        <div class="logo">📚</div>
-        <h1 class="m-0">Smart Librarian</h1>
-      </div>
-
-      <p class="text-secondary">Ask for recommendations, or try: What is “Harry Potter and the Philosopher's Stone” about?</p>
-
-      <div class="card shadow-sm mb-3">
-        <div class="card-body" id="chat">
-          <div class="p-3 rounded mb-2 msg-bot">
-            <strong>Bot</strong><br />
-            Hello! I can recommend books from our small library and include a full summary for the top pick. How can I help?
-          </div>
+  <body class="theme-bookshelf">
+    <!-- Animated bookshelf background with side accents -->
+    <div class="bookshelf-bg">
+      <svg id="animated-bookshelf" width="100%" height="100%"></svg>
+      <svg class="bookshelf-side left" width="120" height="100%" viewBox="0 0 120 900" preserveAspectRatio="none"></svg>
+      <svg class="bookshelf-side right" width="120" height="100%" viewBox="0 0 120 900" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="site-header">
+      <div class="brand">
+        <!-- Custom open book logo with bookmark -->
+        <div class="logo" aria-label="Open book logo">
+          <svg width="48" height="38" viewBox="0 0 48 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="6" width="20" height="28" rx="3" fill="#fff" stroke="#b48a78" stroke-width="2"/>
+            <rect x="26" y="6" width="20" height="28" rx="3" fill="#fff" stroke="#b48a78" stroke-width="2"/>
+            <path d="M24 8 Q26 12 24 16 Q22 12 24 8" fill="#f7c873"/>
+            <rect x="34" y="10" width="4" height="14" rx="1.2" fill="#e9b384"/>
+            <path d="M36 10 v14 l2 -2 l-2 -12 l-2 2 z" fill="#b4a078" opacity="0.5"/>
+            <path d="M2 10 Q12 2 24 8 Q36 2 46 10" stroke="#b48a78" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Smart Librarian</h1>
         </div>
       </div>
-
-      <!-- Input + STT mic -->
-      <form id="form" class="input-group">
-        <input id="input" class="form-control form-control-lg" placeholder="Type your message..." />
-        <button id="micBtn" class="btn btn-outline-secondary" type="button" title="Speak" aria-label="Speak">🎙️</button>
-        <button id="send" class="btn btn-primary btn-lg" type="submit">Send</button>
-      </form>
     </div>
-
+    <main class="chat-shell">
+      <div class="chat-wrap">
+        <div id="chat" class="chat-area"></div>
+        <form id="form" class="composer" autocomplete="off">
+          <input id="input" class="composer-input"
+                 placeholder="Type your message… (e.g., 'Recommend a romance book')" />
+          <button id="micBtn" class="btn mic" type="button" title="Speak" aria-label="Speak">🎙️</button>
+          <button id="send" class="btn send" type="submit">Send</button>
+        </form>
+      </div>
+    </main>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/bookshelf-bg.js"></script>
   </body>
 </html>
