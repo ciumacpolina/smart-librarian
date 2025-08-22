@@ -185,13 +185,11 @@ def build_vector_store(books: List[Dict]):
     os.makedirs(PERSIST_DIR, exist_ok=True)
     client_chroma = chromadb.PersistentClient(path=str(PERSIST_DIR))
 
-    # Start fresh
     try:
         client_chroma.delete_collection(name=COLLECTION_NAME)
     except Exception:
         pass
 
-    # Embedder
     try:
         embedder = embedding_functions.OpenAIEmbeddingFunction(
             api_key=client.api_key,
@@ -200,14 +198,12 @@ def build_vector_store(books: List[Dict]):
     except Exception as e:
         raise RuntimeError(f"Failed to create OpenAI embedding function: {e!r}")
 
-    # Create collection
     collection = client_chroma.create_collection(
         name=COLLECTION_NAME,
         embedding_function=embedder,
         metadata={"hnsw:space": "cosine"},
     )
 
-    # Expand theme vocab
     unique_themes = sorted({t for b in books for t in b.get("themes", [])})
     theme_syn_map = llm_expand_theme_vocab(unique_themes, per_theme_max=3)
 
@@ -224,7 +220,6 @@ def build_vector_store(books: List[Dict]):
             syns.extend(theme_syn_map.get(t, []))
         syns = [s for s in syns if s]
 
-        # Densify themes into the text to improve recall while remaining grounded
         doc_text = (
             f"Title: {title}\n"
             f"Themes: {', '.join(themes)}\n"
@@ -237,19 +232,26 @@ def build_vector_store(books: List[Dict]):
         metadatas.append({"title": title})
         ids.append(f"book-{idx}")
 
-    # Add to collection
     collection.add(documents=documents, metadatas=metadatas, ids=ids)
     return collection
 
 
 # --------------------------- retrieval helpers ---------------------------
 
+def _extract_summary_from_doc(doc_text: str) -> str:
+    """
+    Robustly extract the text after 'Summary:' (case-insensitive), allowing a newline
+    right after the label, e.g. 'Summary:\\nS1'. If no label found, return the whole doc.
+    """
+    if not doc_text:
+        return ""
+    parts = re.split(r'(?is)\bsummary\s*:\s*', doc_text, maxsplit=1)
+    if len(parts) == 2:
+        return parts[1].strip()
+    return doc_text.strip()
+
 def extract_summary(doc_text: str) -> str:
-    """Extract the first 'Summary:' line content from a document."""
-    for line in doc_text.splitlines():
-        if line.startswith("Summary:"):
-            return line.replace("Summary:", "", 1).strip()
-    return doc_text
+    return _extract_summary_from_doc(doc_text)
 
 
 def retrieve_candidates(collection, query: str, k: int = TOP_K) -> List[Dict]:
@@ -263,7 +265,6 @@ def retrieve_candidates(collection, query: str, k: int = TOP_K) -> List[Dict]:
         include=["documents", "metadatas", "distances"],
     )
 
-    # Defensive guards for empty responses
     if not res or not res.get("documents"):
         return []
 

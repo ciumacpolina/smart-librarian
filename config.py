@@ -20,7 +20,7 @@ PERSIST_DIR: Path = BASE / "chroma_db"
 COLLECTION_NAME: str = "books"
 
 # Static output folders used by media routes
-GENERATED_IMAGES_DIR: Path = STATIC_DIR / "images"
+GENERATED_IMAGES_DIR: Path = STATIC_DIR / "gen"
 GENERATED_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 STATIC_AUDIO_DIR: Path = STATIC_DIR / "audio"

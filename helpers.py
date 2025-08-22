@@ -9,36 +9,28 @@ from rag import normalize_text
 
 
 def _to_text(v: Any) -> str:
-    """Return a plain string; join lists with blank lines."""
     if isinstance(v, list):
         return "\n\n".join(str(x) for x in v)
     return str(v) if v is not None else ""
 
 
 def parse_json_loose(text: str) -> Dict:
-    """
-    Parse JSON even if the model wrapped it with extra text.
-    Returns {} on failure.
-    """
     try:
         return json.loads(text or "")
     except Exception:
-        m = re.search(r"\{[\s\S]*\}", text or "")
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except Exception:
-                pass
+        pass
+    m = re.search(r"\{[\s\S]*\}", text or "")
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            return {}
     return {}
 
 
 def get_summary_by_title_local_factory(
     books_ext: list, _books_small_unused: list
 ) -> Callable[[str], str]:
-    """
-    Build a callable that returns the extended summary for a given title
-    (exact or normalized match) or 'NOT_FOUND' when missing.
-    """
     ext_map_norm = {normalize_text(b["title"]): _to_text(b["summary"]) for b in books_ext}
     ext_map_raw = {b["title"]: _to_text(b["summary"]) for b in books_ext}
 
@@ -55,66 +47,83 @@ def get_summary_by_title_local_factory(
     return _impl
 
 
+# --- light normalization for logs / prompt context (LLM must judge by RAW text) ---
 def normalize_for_moderation(s: str) -> str:
-    """Light normalization for safety checks (casefold, strip repeats, keep a–z0–9)."""
     if not s:
         return ""
     t = normalize_text(s)
-    t = re.sub(r"(.)\1{2,}", r"\1\1", t)  # fuuuu -> fuu
+    t = re.sub(r"(.)\1{2,}", r"\1\1", t)
     t = re.sub(r"[^a-z0-9]+", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
 
 def is_offensive(text: str) -> bool:
-    """
-    OpenAI Moderation (multilingual).
-    Returns True if flagged; returns False on SDK/network errors (fail-open).
-    """
+    """Focus on abuse/hate/threats; ignore generic 'violence' buckets."""
     try:
         resp = client.moderations.create(model="omni-moderation-latest", input=text)
         r = resp.results[0]
-        if getattr(r, "flagged", False):
-            return True
         cats = getattr(r, "categories", {}) or {}
-        keys = ["harassment", "harassment/threats", "hate", "hate/threatening"]
+        keys = (
+            "harassment", "harassment/threats",
+            "hate", "hate/threatening",
+            "sexual/harassment", "sexual/minors",
+        )
         return any(bool(cats.get(k, False)) for k in keys)
     except Exception:
-        return False  # fail-open
+        return False
 
 
-def insult_gate_llm(user_text: str) -> bool:
+def insult_gate_llm(user_text: str, *, context_hint: str = "") -> bool:
     """
-    LLM-based profanity/harassment gate.
-    Returns True to allow, False to block. On errors returns True (fail-open).
+    Return True to ALLOW, False to BLOCK.
+    Strict rule: block if the message contains any insult/profanity/slur/harassment/hate,
+    even when mixed with a normal book request. Language-agnostic.
     """
     cleaned = normalize_for_moderation(user_text)
-    tokens = cleaned.split()
 
     system = (
-        "You are a multilingual profanity/insult/harassment detector for a BOOK chatbot. "
+        "You are a multilingual profanity/insult/hate-speech detector for a BOOK chatbot. "
         'Return STRICT JSON: {"block": true|false}. '
-        "BLOCK only if the message clearly contains insult/profanity/slur/harassment/hate speech "
-        "(even if obfuscated or within a longer sentence). If uncertain, set block=false. Output JSON only."
+        "Block if the message contains ANY insult, profanity, slur, harassment, or hate speech "
+        "(even if it appears alongside a normal request). "
+        "Output JSON only."
     )
-    user = f"RAW:\n{user_text}\n\nNORMALIZED:\n{cleaned}\n\nTOKENS:\n{tokens}\n"
+    user = f"RAW:\n{user_text}\n\nNORMALIZED:\n{cleaned}\n"
 
     try:
         resp = client.chat.completions.create(
             model=GATE_MODEL,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
-            temperature=0.0,
+            temperature=0,
+            max_tokens=50,
         )
         data = parse_json_loose(resp.choices[0].message.content)
         return not bool(data.get("block", False))
     except Exception:
-        return True  # fail-open
+        return True
+
+
+def safety_check(user_text: str, *, context_hint: str = "") -> tuple[bool, str]:
+    """
+    Returns (allow, reason).
+    - informational: follow LLM gate (reduce false positives for neutral queries).
+    - other: strict OR with Moderation API.
+    """
+    api_flagged = is_offensive(user_text)
+    llm_allows = insult_gate_llm(user_text, context_hint=context_hint)
+
+    if context_hint == "informational":
+        return (llm_allows, "informational_pass" if llm_allows else "informational_block_llm")
+
+    allow = not (api_flagged or (not llm_allows))
+    return (allow, "strict_pass" if allow else "strict_or_block")
 
 
 def intent_gate(user_text: str) -> Dict[str, str]:
     """
-    Intent router: returns {'action': one of greet/clarify/offtopic/proceed, 'reply': str}.
+    Returns one of: greet / clarify / offtopic / proceed as JSON {action, reply}.
     """
     system = (
         "You are an intent gate for a BOOK recommendation chatbot. "
@@ -134,7 +143,8 @@ def intent_gate(user_text: str) -> Dict[str, str]:
         model=GATE_MODEL,
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": user_text}],
-        temperature=0.0,
+        temperature=0,
+        max_tokens=120,
     )
     data = parse_json_loose(resp.choices[0].message.content)
     action = (data.get("action") or "").lower()
@@ -145,9 +155,10 @@ def intent_gate(user_text: str) -> Dict[str, str]:
 
 
 def clean_reply(text: str) -> str:
-    """Trim boilerplate labels the model may add and strip whitespace."""
     if not text:
         return text
     for lab in ("Extended summary:", "extended summary:", "Summary:", "summary:"):
         text = text.replace(lab, "")
+    lines = [ln.strip() for ln in text.splitlines()]
+    text = "\n".join(ln for ln in lines if ln)
     return text.strip()

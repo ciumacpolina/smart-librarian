@@ -22,7 +22,6 @@ def tts():
         data = request.get_json(force=True) or {}
         text = (data.get("text") or "").strip()
         if not text:
-            # nothing to synthesize
             return Response(status=204)
 
         # streaming path
@@ -78,7 +77,7 @@ def tts():
 # limits and accepted types
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB
 ALLOWED_AUDIO_MIME = {
-    "audio/webm",
+    "audio/webm", 
     "audio/ogg",
     "audio/mpeg",
     "audio/mp4",
@@ -101,41 +100,45 @@ def _suffix_for_mime(m: str) -> str:
 
 @media_bp.post("/stt")
 def stt():
-    """Speech-to-text (gpt-4o-transcribe; fallback whisper-1) -> {'text': ...}."""
+    """
+    Speech-to-Text:
+      - receives multipart/form-data with 'audio' (webm)
+      - transcribes with gpt-4o-transcribe (fallback whisper-1)
+      - returns {"text": "..."} or {"text": ""} when silent/too small
+    """
     try:
-        # size guard
-        if request.content_length and request.content_length > MAX_AUDIO_BYTES:
-            return error_json("Audio too large.", code="too_large", status=413, hint="Max 25MB.")
-
         f = request.files.get("audio")
         if not f:
-            return error_json("Missing 'audio' file.", code="bad_request", status=400)
+            return jsonify({"text": ""}), 400
 
-        mime = (f.mimetype or "").lower()
-        if mime and mime not in ALLOWED_AUDIO_MIME:
-            return error_json(f"Unsupported MIME type: {mime}", code="unsupported_media_type", status=415)
-
-        # persist temporarily for SDK
-        suffix = _suffix_for_mime(mime)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
             temp_path = tmp.name
             f.save(temp_path)
 
         try:
+            # === guard against silence/very short audio ===
+            try:
+                if os.path.getsize(temp_path) < 5000:  
+                    return jsonify({"text": ""})
+            except Exception:
+                pass
+
             with open(temp_path, "rb") as audio_file:
                 try:
                     resp = client.audio.transcriptions.create(
                         model="gpt-4o-transcribe",
-                        file=audio_file,
+                        file=audio_file
                     )
                 except Exception:
                     audio_file.seek(0)
                     resp = client.audio.transcriptions.create(
                         model="whisper-1",
-                        file=audio_file,
+                        file=audio_file
                     )
+
             text = getattr(resp, "text", "") or ""
             return jsonify({"text": text})
+
         finally:
             try:
                 os.remove(temp_path)
@@ -144,7 +147,7 @@ def stt():
 
     except Exception as e:
         print("STT error:", repr(e))
-        return error_json("STT service failed.", code="upstream_error", status=502)
+        return jsonify({"text": ""}), 500
 
 
 # ===================== Image generation =====================

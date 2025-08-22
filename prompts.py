@@ -4,7 +4,7 @@ import json as pyjson
 def build_messages_and_tools(query: str, candidates: List[Dict]) -> Tuple[list, list]:
     """
     Build system/user messages and the single tool schema for the chat call.
-    Logic unchanged: planner + executor in one round with an enforced tool call.
+    Planner + executor in one round with an enforced single tool call.
     """
     system_msg = (
         "You are Smart Librarian — a focused book-recommendation assistant. "
@@ -16,16 +16,18 @@ def build_messages_and_tools(query: str, candidates: List[Dict]) -> Tuple[list, 
         "- If the user's message contains insults/harassment/profanity/hate speech, "
         "reply exactly: 'Please rephrase respectfully.' and stop.\n\n"
         "Selection rules (very important):\n"
-        "1) If the user explicitly asks for ONE book, you MUST return exactly one title.\n"
-        "2) If the user gives a number, return exactly that many titles; do not exceed 3 unless explicitly requested.\n"
-        "3) If quantity is unspecified, return a short list of 1–3 strong matches (avoid padding).\n"
-        "4) Never list more titles than requested; when unsure, prefer ONE.\n\n"
+        "1) If the user explicitly asks for ONE book, return exactly one title.\n"
+        "2) If the user gives a number N, return exactly N titles.\n"
+        "3) If the user explicitly requests an UNBOUNDED quantity (e.g., 'more', 'all', 'as many as possible'), "
+        "return EVERY relevant candidate — do NOT cap the count.\n"
+        "4) If quantity is unspecified (no number and no unbounded request), return a short list of 1–3 strong matches.\n"
+        "5) Never return more titles than requested, except when rule #3 applies (unbounded request).\n\n"
         "Mandatory tool call:\n"
         "- After deciding the final list of titles, call the tool 'get_summaries_by_titles' EXACTLY ONCE with that list "
-        "(even if it contains a single title). Wait for the tool result before producing the final answer.\n"
+        "(even if it contains many titles). Wait for the tool result before producing the final answer.\n"
         "- The tool returns a JSON map {title: full_extended_summary}. For each recommended title, paste the value "
         "verbatim under 'Summary:'. Do not paraphrase or translate tool content. Do not add extra labels.\n\n"
-        "Output format (repeat the block for each recommended title, but NEVER exceed the requested count):\n"
+        "Output format (repeat the block for each recommended title; if many, repeat for all):\n"
         "**<Title>**\n"
         "Why this book?\n"
         "- <2–3 short reasons based only on the candidate summary>\n"
@@ -49,8 +51,10 @@ def build_messages_and_tools(query: str, candidates: List[Dict]) -> Tuple[list, 
         "User message:\n"
         f"{query}\n\n"
         "Remember:\n"
-        "- If the user asked for ONE book, return EXACTLY ONE title.\n"
-        "- Never output more titles than requested."
+        "- If the user asked for ONE book, return EXACTLY ONE.\n"
+        "- If the user asked for a number N, return EXACTLY N.\n"
+        "- If the user asked for an UNBOUNDED quantity (e.g., 'more', 'all', 'as many as possible'), return EVERY relevant candidate.\n"
+        "- If quantity is unspecified, return 1–3 strong matches."
     )
 
     tools = [

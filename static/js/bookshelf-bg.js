@@ -1,116 +1,123 @@
-// Animated bookshelf SVG background with side accents
+// Animated bookshelf background (main grid + side accents)
+(() => {
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const rand = (min, max) => min + Math.random() * (max - min);
+  const randint = (min, max) => Math.floor(rand(min, max + 1));
 
-// Main background bookshelf
-const svg = document.getElementById('animated-bookshelf');
-if (svg) {
-  const shelves = 6; // era 5, acum 6 rafturi
-  const booksPerShelf = 18; // era 12, acum 18 cărți pe raft
-  const shelfHeight = 120;
-  const bookMin = 28, bookMax = 54;
-  const colors = [
-    'var(--book1)', 'var(--book2)', 'var(--book3)', 'var(--book4)', 'var(--book5)'
-  ];
+  const COLORS = ['var(--book1)', 'var(--book2)', 'var(--book3)', 'var(--book4)', 'var(--book5)'];
+  const SHELF_FILL = 'var(--shelf)';
 
-  svg.setAttribute('viewBox', `0 0 1200 700`);
-  svg.innerHTML = '';
+  // Main bookshelf (center)
+  const main = document.getElementById('animated-bookshelf');
+  if (main) {
+    const shelves = 6;
+    const booksPerShelf = 18;
+    const shelfHeight = 120;
+    const top = 80;
+    const barH = 18;
+    const barX = 60;
+    const barW = 1080;
+    const viewW = 1200;
+    const viewH = top + shelves * shelfHeight + 100;
 
-  // Draw shelves
-  for (let s = 0; s < shelves; ++s) {
-    const y = 80 + s * shelfHeight;
-    // Shelf bar
-    const shelf = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    shelf.setAttribute('x', 60);
-    shelf.setAttribute('y', y + 48);
-    shelf.setAttribute('width', 1080);
-    shelf.setAttribute('height', 18);
-    shelf.setAttribute('rx', 7);
-    shelf.setAttribute('fill', 'var(--shelf)');
-    shelf.setAttribute('opacity', '0.95');
-    svg.appendChild(shelf);
+    main.setAttribute('viewBox', `0 0 ${viewW} ${viewH}`);
+    main.innerHTML = '';
 
-    // Books
-    let x = 80;
-    for (let b = 0; b < booksPerShelf; ++b) {
-      const w = bookMin + Math.random() * (bookMax - bookMin);
-      const h = 60 + Math.random() * 38;
-      const book = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      book.setAttribute('x', x);
-      book.setAttribute('y', y + 48 - h);
-      book.setAttribute('width', w);
-      book.setAttribute('height', h);
-      book.setAttribute('rx', 5 + Math.random() * 4);
-      book.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
-      book.setAttribute('opacity', 0.82 + Math.random() * 0.16);
-      svg.appendChild(book);
+    for (let s = 0; s < shelves; s++) {
+      const y = top + s * shelfHeight;
 
-      // Animate books up/down slightly
-      const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
-      anim.setAttribute('attributeName', 'transform');
-      anim.setAttribute('type', 'translate');
-      anim.setAttribute('values', `0,0; 0,${-4 - Math.random()*3}; 0,0`);
-      anim.setAttribute('dur', `${2.5 + Math.random()*2}s`);
-      anim.setAttribute('repeatCount', 'indefinite');
-      anim.setAttribute('begin', `${Math.random()*2}s`);
-      book.appendChild(anim);
+      const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bar.setAttribute('x', barX);
+      bar.setAttribute('y', (y + 48).toString());
+      bar.setAttribute('width', barW.toString());
+      bar.setAttribute('height', barH.toString());
+      bar.setAttribute('rx', '7');
+      bar.setAttribute('fill', SHELF_FILL);
+      bar.setAttribute('opacity', '0.95');
+      main.appendChild(bar);
 
-      x += w + 12 + Math.random() * 10;
-      if (x > 1100) break;
+      let x = 80;
+      for (let b = 0; b < booksPerShelf; b++) {
+        const w = rand(28, 54);
+        const h = rand(60, 98);
+
+        const book = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        book.setAttribute('x', x.toString());
+        book.setAttribute('y', (y + 48 - h).toString());
+        book.setAttribute('width', w.toString());
+        book.setAttribute('height', h.toString());
+        book.setAttribute('rx', rand(5, 9).toFixed(2));
+        book.setAttribute('fill', pick(COLORS));
+        book.setAttribute('opacity', (0.82 + Math.random() * 0.16).toFixed(2));
+        main.appendChild(book);
+
+        const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
+        anim.setAttribute('attributeName', 'transform');
+        anim.setAttribute('type', 'translate');
+        anim.setAttribute('values', `0,0; 0,${(-rand(2, 7)).toFixed(2)}; 0,0`);
+        anim.setAttribute('dur', `${(2.5 + Math.random() * 2).toFixed(2)}s`);
+        anim.setAttribute('repeatCount', 'indefinite');
+        anim.setAttribute('begin', `${Math.random().toFixed(2)}s`);
+        book.appendChild(anim);
+
+        x += w + 12 + Math.random() * 10;
+        if (x > 1100) break;
+      }
     }
   }
-}
 
-// Side bookshelf accents
-function drawSideBookshelf(svg, flip = false) {
-  if (!svg) return;
-  svg.innerHTML = '';
-  const shelfCount = 8; // era 6, acum 8 rafturi laterale
-  const shelfGap = 100; // mai apropiate între ele
-  const bookColors = [
-    'var(--book1)', 'var(--book2)', 'var(--book3)', 'var(--book4)', 'var(--book5)'
-  ];
-  for (let s = 0; s < shelfCount; ++s) {
-    const y = 40 + s * shelfGap;
-    // Shelf
-    const shelf = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    shelf.setAttribute('x', 10);
-    shelf.setAttribute('y', y + 48);
-    shelf.setAttribute('width', 100);
-    shelf.setAttribute('height', 14);
-    shelf.setAttribute('rx', 6);
-    shelf.setAttribute('fill', 'var(--shelf)');
-    shelf.setAttribute('opacity', '0.93');
-    svg.appendChild(shelf);
+  // Side bookshelves (left/right). If right is mirrored via CSS, no flip needed here.
+  function drawSideBookshelf(svg) {
+    if (!svg) return;
+    svg.innerHTML = '';
 
-    // Books
-    let x = 18;
-    const books = 7 + Math.floor(Math.random() * 3); // era 4-6, acum 7-9 cărți pe raft lateral
-    for (let b = 0; b < books; ++b) {
-      const w = 14 + Math.random() * 18;
-      const h = 38 + Math.random() * 32;
-      const book = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      book.setAttribute('x', x);
-      book.setAttribute('y', y + 48 - h);
-      book.setAttribute('width', w);
-      book.setAttribute('height', h);
-      book.setAttribute('rx', 3 + Math.random() * 2);
-      book.setAttribute('fill', bookColors[Math.floor(Math.random() * bookColors.length)]);
-      book.setAttribute('opacity', 0.82 + Math.random() * 0.16);
-      svg.appendChild(book);
+    const shelfCount = 8;
+    const shelfGap = 100;
 
-      // Animate books up/down slightly
-      const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
-      anim.setAttribute('attributeName', 'transform');
-      anim.setAttribute('type', 'translate');
-      anim.setAttribute('values', `0,0; 0,${-2 - Math.random()*2}; 0,0`);
-      anim.setAttribute('dur', `${2.5 + Math.random()*2}s`);
-      anim.setAttribute('repeatCount', 'indefinite');
-      anim.setAttribute('begin', `${Math.random()*2}s`);
-      book.appendChild(anim);
+    for (let s = 0; s < shelfCount; s++) {
+      const y = 40 + s * shelfGap;
 
-      x += w + 6 + Math.random() * 6;
-      if (x > 90) break;
+      const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bar.setAttribute('x', '10');
+      bar.setAttribute('y', (y + 48).toString());
+      bar.setAttribute('width', '100');
+      bar.setAttribute('height', '14');
+      bar.setAttribute('rx', '6');
+      bar.setAttribute('fill', SHELF_FILL);
+      bar.setAttribute('opacity', '0.93');
+      svg.appendChild(bar);
+
+      let x = 18;
+      const books = randint(7, 9);
+      for (let b = 0; b < books; b++) {
+        const w = rand(14, 32);
+        const h = rand(38, 70);
+
+        const book = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        book.setAttribute('x', x.toString());
+        book.setAttribute('y', (y + 48 - h).toString());
+        book.setAttribute('width', w.toString());
+        book.setAttribute('height', h.toString());
+        book.setAttribute('rx', rand(3, 5).toFixed(2));
+        book.setAttribute('fill', pick(COLORS));
+        book.setAttribute('opacity', (0.82 + Math.random() * 0.16).toFixed(2));
+        svg.appendChild(book);
+
+        const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
+        anim.setAttribute('attributeName', 'transform');
+        anim.setAttribute('type', 'translate');
+        anim.setAttribute('values', `0,0; 0,${(-rand(2, 4)).toFixed(2)}; 0,0`);
+        anim.setAttribute('dur', `${(2.5 + Math.random() * 2).toFixed(2)}s`);
+        anim.setAttribute('repeatCount', 'indefinite');
+        anim.setAttribute('begin', `${Math.random().toFixed(2)}s`);
+        book.appendChild(anim);
+
+        x += w + 6 + Math.random() * 6;
+        if (x > 90) break;
+      }
     }
   }
-}
-drawSideBookshelf(document.querySelector('.bookshelf-side.left'));
-drawSideBookshelf(document.querySelector('.bookshelf-side.right'), true);
+
+  drawSideBookshelf(document.querySelector('.bookshelf-side.left'));
+  drawSideBookshelf(document.querySelector('.bookshelf-side.right'));
+})();

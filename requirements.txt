@@ -2,3 +2,4 @@ openai
 flask
 chromadb
 python-dotenv
+pytest

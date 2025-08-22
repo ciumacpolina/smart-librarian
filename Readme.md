@@ -26,13 +26,20 @@
 git clone https://github.com/username/book_chatbot.git
 cd book_chatbot
 
+#Create and activate a virtual environment
+py -m venv .venv
+.venv\Scripts\Activate  
+
 # Add OpenAI key in a .env file
 echo "OPENAI_API_KEY=sk-..." > .env
 
+#Install dependencies
 pip install -r requirements.txt
+
+#Start the Flask app
 python web.py
 ```
-
+#Visit the app in your browser
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in browser.
 
 ---
@@ -50,7 +57,7 @@ book_chatbot/
 ├── routes_media.py     # TTS, STT, image generation endpoints
 │
 ├── data/
-│   ├── books.json      # Main book database (title, summary, themes)
+│   ├── books.json      # short summaries + metadata (title, summary, themes)
 │   └── books_ext.json  # Extended summaries
 │
 ├── static/
@@ -62,6 +69,15 @@ book_chatbot/
 ├── templates/
 │   └── index.html      # Main web UI
 │
+├── tests/
+│   ├─ conftest.py
+│   ├─ test_helpers.py
+│   ├─ test_rag.py
+│   ├─ test_prompts.py
+│   ├─ test_web_chat.py
+│   ├─ test_routes_media.py
+│   ├─ test_edge_cases.py
+│ 
 ├── requirements.txt
 └── .env                
 ```

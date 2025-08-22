@@ -1,5 +1,3 @@
-// static/js/app.js
-
 const form  = document.getElementById("form");
 const input = document.getElementById("input");
 const chat  = document.getElementById("chat");
@@ -7,7 +5,7 @@ const sendBtn = document.getElementById("send");
 const autoSpeakCheckbox = document.getElementById("autoSpeak");
 const micBtn = document.getElementById("micBtn");
 
-// ===== Markdown safe options =====
+// ----- Markdown -----
 if (window.marked) {
   marked.setOptions({ mangle:false, headerIds:false, breaks:true });
 }
@@ -26,8 +24,15 @@ function renderBot(text) {
   return escapeHtml(text || "").replace(/\n/g, "<br>");
 }
 
-// ===================== TTS: single-player, toggle, no overlap =====================
-const ttsPlayers = new Map(); // btn -> { audio, state, url, lastTime }
+/* ===================== TTS: single-player registry ===================== */
+const ttsPlayers = new Map(); 
+
+function anyTTSPlaying() {
+  for (const item of ttsPlayers.values()) {
+    if (item && item.state === 'playing') return true;
+  }
+  return false;
+}
 
 async function fetchTTSBlob(text) {
   const clean = (text || "")
@@ -36,7 +41,7 @@ async function fetchTTSBlob(text) {
     .replace(/_/g, "");
   if (!clean.trim()) return null;
 
-  const resp = await fetch('/tts', {
+  const resp = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: clean })
@@ -56,6 +61,7 @@ function stopAllOtherPlayers(exceptBtn) {
   }
 }
 
+// attach a controllable TTS to a button (toggle play/pause)
 function attachTTS(btn, text) {
   btn.addEventListener('click', async () => {
     let item = ttsPlayers.get(btn);
@@ -127,8 +133,28 @@ function attachTTS(btn, text) {
   });
 }
 
+async function ensureSingleTTSPlay(hostEl, text) {
+  if (anyTTSPlaying()) return;
+
+  let speakBtn = hostEl.querySelector('.speak-btn');
+  if (!speakBtn) {
+    speakBtn = document.createElement('button');
+    speakBtn.className = 'speak-btn btn btn-sm btn-outline-secondary';
+    speakBtn.textContent = '🔊';
+    speakBtn.type = 'button';
+    const line = document.createElement('div');
+    line.style.marginTop = '6px';
+    line.appendChild(speakBtn);
+    hostEl.appendChild(line);
+    attachTTS(speakBtn, text);
+  }
+  speakBtn.click();
+}
+
 function addSpeakButtonToMessage(messageEl, text) {
   if (!messageEl) return;
+  if (messageEl.querySelector('.speak-btn')) return;
+
   const btn = document.createElement('button');
   btn.className = 'speak-btn btn btn-sm btn-outline-secondary';
   btn.textContent = '🔊';
@@ -144,10 +170,63 @@ function addSpeakButtonToMessage(messageEl, text) {
   attachTTS(btn, text);
 }
 
-// ===================== Speech-to-Text (STT) =====================
+/* ===================== STT with simple VAD (silence guard) ===================== */
 let mediaStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
+
+let audioCtx = null;
+let analyser = null;
+let sourceNode = null;
+let vadRaf = 0;
+let speechDetected = false;
+
+function startVAD(stream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+
+  sourceNode = audioCtx.createMediaStreamSource(stream);
+  sourceNode.connect(analyser);
+
+  const buf = new Uint8Array(analyser.fftSize);
+  speechDetected = false;
+
+  const THRESH = 12;        
+  const HITS_TO_CONFIRM = 6; 
+
+  let hits = 0;
+
+  const tick = () => {
+    analyser.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const dev = buf[i] - 128;
+      sum += dev * dev;
+    }
+    const rms = Math.sqrt(sum / buf.length);
+
+    if (rms > THRESH) {
+      hits++;
+      if (hits >= HITS_TO_CONFIRM) speechDetected = true;
+    } else {
+      hits = Math.max(0, hits - 1);
+    }
+
+    vadRaf = requestAnimationFrame(tick);
+  };
+
+  vadRaf = requestAnimationFrame(tick);
+}
+
+function stopVAD() {
+  try { cancelAnimationFrame(vadRaf); } catch (e) {}
+  vadRaf = 0;
+  try { sourceNode && sourceNode.disconnect(); } catch (e) {}
+  try { analyser && analyser.disconnect(); } catch (e) {}
+  try { audioCtx && audioCtx.close(); } catch (e) {}
+  sourceNode = null; analyser = null; audioCtx = null;
+}
 
 async function startRecording() {
   try {
@@ -155,11 +234,26 @@ async function startRecording() {
     audioChunks = [];
     mediaRecorder = new MediaRecorder(mediaStream, { mimeType: "audio/webm" });
 
+    startVAD(mediaStream);
+
     mediaRecorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) audioChunks.push(e.data);
     };
 
     mediaRecorder.onstop = async () => {
+      stopVAD();
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      micBtn?.classList.remove("recording");
+
+      if (!speechDetected) {
+        console.info("No speech detected; skipping STT.");
+        audioChunks = [];
+        return;
+      }
+
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
       audioChunks = [];
 
@@ -167,7 +261,7 @@ async function startRecording() {
       fd.append("audio", blob, "speech.webm");
 
       try {
-        const resp = await fetch("/stt", { method: "POST", body: fd });
+        const resp = await fetch("/api/stt", { method: "POST", body: fd });
         const data = await resp.json();
         if (data && data.text) {
           input.value = data.text;
@@ -175,12 +269,6 @@ async function startRecording() {
         }
       } catch (err) {
         console.error("STT /stt error:", err);
-      } finally {
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(t => t.stop());
-          mediaStream = null;
-        }
-        micBtn?.classList.remove("recording");
       }
     };
 
@@ -189,6 +277,11 @@ async function startRecording() {
   } catch (e) {
     console.error("Mic permission / recording error:", e);
     micBtn?.classList.remove("recording");
+    stopVAD();
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
   }
 }
 
@@ -198,6 +291,7 @@ function stopRecording() {
       mediaRecorder.stop();
     } else {
       micBtn?.classList.remove("recording");
+      stopVAD();
       if (mediaStream) {
         mediaStream.getTracks().forEach(t => t.stop());
         mediaStream = null;
@@ -205,6 +299,7 @@ function stopRecording() {
     }
   } catch (e) {
     console.error("stopRecording error:", e);
+    stopVAD();
   }
 }
 
@@ -218,35 +313,59 @@ if (micBtn) {
   });
 }
 
-// ===================== Image generation =====================
-async function generateImageFromText(text, hostEl) {
-  try {
-    const resp = await fetch('/image', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ prompt: text, size: '1024x1024', quality: 'low' })
-    });
-    if (!resp.ok) {
-      console.warn('Image generation failed:', await resp.text());
-      return;
-    }
-    const data = await resp.json();
-    if (!data.url) return;
+/* ===================== Image helpers (update instead of duplicate) ===================== */
+function normTitle(s) {
+  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
 
-    const img = document.createElement('img');
-    img.src = data.url + '?t=' + Date.now();
-    img.alt = 'Generated illustration';
-    img.className = 'gen-img';
-    hostEl.appendChild(img);
+function findCardForTitle(messageEl, title) {
+  const wanted = normTitle(title);
+  const cards = messageEl.querySelectorAll(".book-card");
+  for (const card of cards) {
+    const h = card.querySelector(".book-title");
+    if (h && normTitle(h.textContent) === wanted) return card;
+  }
+  return null;
+}
 
-    // zoom la click
-    img.addEventListener('click', () => img.classList.toggle('full'));
-  } catch (e) {
-    console.error('Image error', e);
+function getOrCreateCoverImg(messageEl, title) {
+  const wanted = normTitle(title);
+  const card = findCardForTitle(messageEl, title) || messageEl;
+
+  let img = card.querySelector(`img.gen-img[data-title-norm="${wanted}"]`);
+  if (img) return img;
+
+  img = document.createElement("img");
+  img.className = "gen-img";
+  img.setAttribute("data-title-norm", wanted);
+  img.alt = "Generated cover";
+  img.style.cursor = "pointer";
+  img.addEventListener("click", () => img.classList.toggle("full"));
+  card.appendChild(img);
+  return img;
+}
+
+async function fetchImageURL(prompt, size = "1024x1024", quality = "low") {
+  const r = await fetch("/api/image", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ prompt, size, quality })
+  });
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => ({}));
+  return j && j.url ? j.url : null;
+}
+
+// generate (or update) a cover for a specific title in this message
+async function generateOrUpdateCoverForTitle({ messageEl, title, imagePrompt }) {
+  const url = await fetchImageURL(imagePrompt);
+  if (url) {
+    const img = getOrCreateCoverImg(messageEl, title);
+    img.src = url + "?t=" + Date.now(); 
   }
 }
 
-// — găsește titlurile în markdown ca linii de forma **Title**
+/* ===================== Extract titles from markdown ===================== */
 function extractTitlesFromMarkdown(md) {
   const titles = [];
   const lines = (md || "").split(/\r?\n/);
@@ -257,14 +376,13 @@ function extractTitlesFromMarkdown(md) {
   return [...new Set(titles)];
 }
 
-// Împachetează secțiunile începute cu **Title** într-un "card" frumos
+/* ===================== Beautify book blocks into cards ===================== */
 function beautifyBookBlocks(container) {
   if (!container) return;
   const pList = Array.from(container.querySelectorAll('p'));
 
   for (let i = 0; i < pList.length; i++) {
     const p = pList[i];
-    // paragrafe care conțin DOAR <strong>Title</strong>
     if (
       p.children.length === 1 &&
       p.firstElementChild.tagName === 'STRONG' &&
@@ -272,7 +390,6 @@ function beautifyBookBlocks(container) {
     ) {
       const title = p.textContent.trim();
 
-      // card
       const card = document.createElement('div');
       card.className = 'book-card';
 
@@ -281,13 +398,11 @@ function beautifyBookBlocks(container) {
       header.textContent = title;
       card.appendChild(header);
 
-      // mutăm în card toate nodurile până la următorul titlu
       let node = p.nextSibling;
       p.remove();
 
       while (node) {
         const next = node.nextSibling;
-
         if (
           node.nodeType === 1 &&
           node.tagName === 'P' &&
@@ -303,7 +418,6 @@ function beautifyBookBlocks(container) {
       if (node) container.insertBefore(card, node);
       else container.appendChild(card);
 
-      // etichete
       card.querySelectorAll('p').forEach(pp => {
         const t = (pp.textContent || '').trim();
         if (/^Why this book\??$/i.test(t)) {
@@ -320,7 +434,7 @@ function beautifyBookBlocks(container) {
   }
 }
 
-// — Creează un grup de butoane (🖼️ + numele cărții), unul pentru fiecare titlu
+/* ===================== Buttons per title (generate/update cover + single TTS) ===================== */
 function addImageButtonsForTitles(messageEl, replyMarkdown) {
   if (!messageEl) return;
   const titles = extractTitlesFromMarkdown(replyMarkdown);
@@ -333,7 +447,7 @@ function addImageButtonsForTitles(messageEl, replyMarkdown) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-sm btn-outline-secondary icon-btn';
-    btn.title = `Generate image for "${title}"`;
+    btn.title = `Generate/Update cover for "${title}"`;
     btn.innerHTML = `🖼️ <span>${title}</span>`;
 
     btn.onclick = async () => {
@@ -341,9 +455,15 @@ function addImageButtonsForTitles(messageEl, replyMarkdown) {
       btn.disabled = true;
       btn.innerHTML = '…';
       try {
-        const promptText = `Design a simple, minimalist book cover for the novel "${title}".
-Use clean layout, big readable title text, and one symbolic illustration.`;
-        await generateImageFromText(promptText, messageEl);
+        const promptText =
+          `Design a simple, minimalist book cover for "${title}". ` +
+          `Use a clean layout, readable title, and one symbolic illustration.`;
+
+        await generateOrUpdateCoverForTitle({
+        messageEl,
+        title,
+        imagePrompt: promptText
+        });
       } finally {
         btn.disabled = false;
         btn.innerHTML = old;
@@ -356,7 +476,7 @@ Use clean layout, big readable title text, and one symbolic illustration.`;
   messageEl.appendChild(box);
 }
 
-// ============ Chat rendering ============
+/* ===================== Chat rendering ===================== */
 function addMsg(text, who) {
   const wrap = document.createElement("div");
   wrap.className = `msg ${who === "user" ? "msg-user" : "msg-bot"}`;
@@ -371,11 +491,10 @@ function addMsg(text, who) {
   chat.scrollTop = chat.scrollHeight;
   return wrap;
 }
-// după ce selectezi #chat:
+
 addMsg("Hello! I can recommend books from our small library and include a full summary for the top pick. How can I help?", "bot");
 
-
-// ============ Submit handler ============
+/* ===================== Submit handler ===================== */
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const msg = input.value.trim();
@@ -404,20 +523,12 @@ form.addEventListener("submit", async (e) => {
     const replyText = data.reply || "(no reply)";
     const el = addMsg(replyText, "bot");
 
-    // transformăm blocurile în carduri
     beautifyBookBlocks(el);
-
-    // TTS
     addSpeakButtonToMessage(el, replyText);
-
-    // butoane imagine (unul per titlu)
     addImageButtonsForTitles(el, replyText);
 
-    // auto-speak
-    if (autoSpeakCheckbox && autoSpeakCheckbox.checked) {
-      const fakeBtn = document.createElement('button');
-      attachTTS(fakeBtn, replyText);
-      fakeBtn.click();
+    if (autoSpeakCheckbox && autoSpeakCheckbox.checked && !anyTTSPlaying()) {
+      await ensureSingleTTSPlay(el, replyText);
     }
   } catch (err) {
     chat.removeChild(thinking);
