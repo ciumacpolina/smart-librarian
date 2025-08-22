@@ -38,9 +38,12 @@ pip install -r requirements.txt
 
 #Start the Flask app
 python web.py
-```
+
 #Visit the app in your browser
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in browser.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
+
+#Testing
+pytest -q
 
 ---
 
